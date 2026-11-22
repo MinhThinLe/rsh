@@ -24,7 +24,7 @@ impl Shell {
         ctrl_c_thread(events_sender.clone());
         input_thread(events_sender.clone());
 
-        Shell {
+        Self {
             events: events_receiver,
             sender: events_sender,
         }
@@ -36,11 +36,11 @@ impl Shell {
             match event {
                 ShellEvent::CtrlC => {
                     println!("Ctrl c received");
-                    self.print_prompt();
+                    print_prompt();
                 }
                 ShellEvent::Input(string) => {
-                    self.process_command(string);
-                    self.print_prompt();
+                    self.process_command(&string);
+                    print_prompt();
                 }
                 ShellEvent::NewChild(id) => println!("New child {id}"),
                 ShellEvent::ChildExited(id) => println!("Child {id} exited"),
@@ -48,8 +48,8 @@ impl Shell {
         }
     }
 
-    fn process_command(&self, command: String) {
-        let tokens = match Tokens::from_str(&command) {
+    fn process_command(&self, command: &str) {
+        let tokens = match Tokens::from_str(command) {
             Ok(token) => token,
             Err(TokenizingError::EmptyInput) => return, // Should not be possible
             Err(TokenizingError::UnmatchedQuote) => {
@@ -65,23 +65,23 @@ impl Shell {
 
         spawn_child(tokens, self.sender.clone());
     }
+}
 
-    fn print_prompt(&self) {
-        const SHELL_PROMPT: &str = "-> ";
-        stdout()
-            .write_all(SHELL_PROMPT.as_bytes())
-            .expect("Unable to write to stdout");
-        stdout().flush().expect("Unable to flush stdout")
-    }
+fn print_prompt() {
+    const SHELL_PROMPT: &str = "-> ";
+    stdout()
+        .write_all(SHELL_PROMPT.as_bytes())
+        .expect("Unable to write to stdout");
+    stdout().flush().expect("Unable to flush stdout");
 }
 
 fn ctrl_c_thread(sender: Sender<ShellEvent>) {
     ctrlc::set_handler(move || {
         sender
             .send(ShellEvent::CtrlC)
-            .expect("Unable to send an event")
+            .expect("Unable to send an event");
     })
-    .expect("Unable to set a ctrl-c handler")
+    .expect("Unable to set a ctrl-c handler");
 }
 
 fn input_thread(sender: Sender<ShellEvent>) {

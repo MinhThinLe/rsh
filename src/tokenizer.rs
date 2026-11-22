@@ -55,7 +55,7 @@ impl FromStr for Tokens {
             tokens.push(buffer);
         }
 
-        Ok(Tokens(tokens))
+        Ok(Self(tokens))
     }
 }
 
@@ -64,7 +64,7 @@ impl Tokens {
         self.0[0].as_str()
     }
 
-    pub fn into_args(&self) -> Args {
+    pub fn into_args(self) -> Args {
         if self.0.len() == 1 {
             Args(Vec::new())
         } else {
