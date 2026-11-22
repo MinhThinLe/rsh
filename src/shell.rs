@@ -1,5 +1,9 @@
 use std::io::{Write, stdout};
+use std::str::FromStr;
 use std::sync::mpsc::{Receiver, Sender, channel};
+
+use crate::commands::get_builtin_handle;
+use crate::tokenizer::{TokenizingError, Tokens};
 
 enum ShellEvent {
     CtrlC,
@@ -36,9 +40,18 @@ impl Shell {
     }
 
     fn process_command(&self, command: String) {
-        match command.as_str() {
-            "exit" => std::process::exit(0),
-            _ => (),
+        let tokens = match Tokens::from_str(&command) {
+            Ok(token) => token,
+            Err(TokenizingError::EmptyInput) => return, // Should not be possible
+            Err(TokenizingError::UnmatchedQuote) => {
+                println!("Unmatched \"");
+                return;
+            }
+        };
+
+        if let Some(builtin) = get_builtin_handle(tokens.command()) {
+            builtin(tokens.into_args());
+            return;
         }
 
         println!("Processing command: {command}")
@@ -46,7 +59,9 @@ impl Shell {
 
     fn print_prompt(&self) {
         const SHELL_PROMPT: &str = "-> ";
-        stdout().write_all(SHELL_PROMPT.as_bytes()).expect("Unable to write to stdout");
+        stdout()
+            .write_all(SHELL_PROMPT.as_bytes())
+            .expect("Unable to write to stdout");
         stdout().flush().expect("Unable to flush stdout")
     }
 }
