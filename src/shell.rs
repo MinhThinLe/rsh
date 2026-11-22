@@ -2,12 +2,14 @@ use std::io::{Write, stdout};
 use std::str::FromStr;
 use std::sync::mpsc::{Receiver, Sender, channel};
 
-use crate::commands::get_builtin_handle;
+use crate::commands::{get_builtin_handle, spawn_child};
 use crate::tokenizer::{TokenizingError, Tokens};
 
-enum ShellEvent {
+pub enum ShellEvent {
     CtrlC,
     Input(String),
+    NewChild(u32),
+    ChildExited(u32),
 }
 
 pub struct Shell {
@@ -30,11 +32,18 @@ impl Shell {
 
     pub fn process(self) {
         loop {
-            self.print_prompt();
             let event = self.events.recv().expect("Unable to receive an event");
             match event {
-                ShellEvent::CtrlC => println!("Ctrl c received"),
-                ShellEvent::Input(string) => self.process_command(string),
+                ShellEvent::CtrlC => {
+                    println!("Ctrl c received");
+                    self.print_prompt();
+                }
+                ShellEvent::Input(string) => {
+                    self.process_command(string);
+                    self.print_prompt();
+                }
+                ShellEvent::NewChild(id) => println!("New child {id}"),
+                ShellEvent::ChildExited(id) => println!("Child {id} exited"),
             }
         }
     }
@@ -54,7 +63,7 @@ impl Shell {
             return;
         }
 
-        println!("Processing command: {command}")
+        spawn_child(tokens, self.sender.clone());
     }
 
     fn print_prompt(&self) {
