@@ -66,10 +66,19 @@ impl Tokens {
 
     pub fn into_args(self) -> Args {
         if self.0.len() == 1 {
-            Args(Vec::new())
-        } else {
-            Args(self.0[1..].to_vec())
+            return Args(Vec::new());
         }
+        if self.is_background_process() {
+            return Args(self.0[1..self.0.len() - 1].to_vec());
+        }
+        Args(self.0[1..].to_vec())
+    }
+
+    pub fn is_background_process(&self) -> bool {
+        self.0
+            .last()
+            .map(|item| item.contains('&'))
+            .unwrap_or_default()
     }
 }
 
@@ -83,6 +92,7 @@ mod test {
         const INPUT_2: &str = r#"this "has quotes""#;
         const INPUT_3: &str = r#"this "has an unmatched quote"#;
         const INPUT_4: &str = "separated     by     multiple        whitespaces";
+        const INPUT_5: &str = "background processes have a & suffix &";
 
         let tokens: Tokens = INPUT_1.parse().unwrap();
         assert_eq!(tokens.0, vec!["this", "is", "a", "normal", "string"]);
@@ -94,6 +104,13 @@ mod test {
         assert!(tokens.is_err());
 
         let tokens: Tokens = INPUT_4.parse().unwrap();
-        assert_eq!(tokens.0, vec!["separated", "by", "multiple", "whitespaces"])
+        assert_eq!(tokens.0, vec!["separated", "by", "multiple", "whitespaces"]);
+
+        let tokens: Tokens = INPUT_5.parse().unwrap();
+        assert!(tokens.is_background_process());
+        assert_eq!(
+            tokens.into_args().0,
+            vec!["processes", "have", "a", "&", "suffix"]
+        );
     }
 }

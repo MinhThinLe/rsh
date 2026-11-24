@@ -3,12 +3,13 @@ use std::str::FromStr;
 use std::sync::mpsc::{Receiver, Sender, channel};
 
 use crate::commands::{get_builtin_handle, spawn_child};
+use crate::input::{Input, input_thread};
 use crate::tokenizer::{TokenizingError, Tokens};
 
 pub enum ShellEvent {
     CtrlC,
-    Input(String),
-    NewChild(u32),
+    Input(Input),
+    NewChild(u32, bool),
     ChildExited(u32),
 }
 
@@ -32,24 +33,26 @@ impl Shell {
 
     pub fn process(self) {
         loop {
+            print_prompt();
             let event = self.events.recv().expect("Unable to receive an event");
             match event {
-                ShellEvent::CtrlC => {
-                    println!("Ctrl c received");
-                    print_prompt();
-                }
-                ShellEvent::Input(string) => {
-                    self.process_command(&string);
-                    print_prompt();
-                }
-                ShellEvent::NewChild(id) => println!("New child {id}"),
+                ShellEvent::CtrlC => println!("Ctrl c received"),
+                ShellEvent::Input(string) => self.process_input(string),
+                ShellEvent::NewChild(id, _is_foreground) => println!("New child {id}"),
                 ShellEvent::ChildExited(id) => println!("Child {id} exited"),
             }
         }
     }
 
-    fn process_command(&self, command: &str) {
-        let tokens = match Tokens::from_str(command) {
+    fn process_input(&self, input: Input) {
+        let command = match input {
+            Input::Newline | Input::EOF => {
+                println!("");
+                return;
+            }
+            Input::Line(line) => line,
+        };
+        let tokens = match Tokens::from_str(&command) {
             Ok(token) => token,
             Err(TokenizingError::EmptyInput) => return, // Should not be possible
             Err(TokenizingError::UnmatchedQuote) => {
@@ -82,25 +85,4 @@ fn ctrl_c_thread(sender: Sender<ShellEvent>) {
             .expect("Unable to send an event");
     })
     .expect("Unable to set a ctrl-c handler");
-}
-
-fn input_thread(sender: Sender<ShellEvent>) {
-    std::thread::spawn(move || {
-        let mut line = String::new();
-        loop {
-            std::io::stdin()
-                .read_line(&mut line)
-                .expect("Failed to read from stdin");
-
-            let input = line.trim();
-            if input.is_empty() {
-                continue;
-            }
-
-            sender
-                .send(ShellEvent::Input(input.to_string()))
-                .expect("Failed to send an event");
-            line.clear();
-        }
-    });
 }
