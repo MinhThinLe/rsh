@@ -1,8 +1,45 @@
+use std::io::{PipeWriter, Write};
 use std::process::{Command, exit};
 use std::sync::mpsc::Sender;
 
+use crate::input::Input;
 use crate::shell::ShellEvent;
 use crate::tokenizer::{Args, Tokens};
+
+pub struct ChildProcess {
+    id: u32,
+    stdin: Option<PipeWriter>,
+    is_background: bool,
+}
+
+impl ChildProcess {
+    fn close_stdin(&mut self) {
+        self.stdin = None;
+    }
+
+    pub fn is_foreground(&self) -> bool {
+        !self.is_background
+    }
+
+    pub fn id(&self) -> u32 {
+        self.id
+    }
+
+    pub fn handle_input(&mut self, input: Input) -> std::io::Result<()> {
+        let Some(ref mut stdin) = self.stdin else {
+            return Ok(());
+        };
+
+        match input {
+            Input::Eof => {
+                self.close_stdin();
+                return Ok(());
+            }
+            Input::Newline => stdin.write_all(b"\n"),
+            Input::Line(line) => stdin.write_all(line.as_bytes()),
+        }
+    }
+}
 
 pub fn get_builtin_handle(command: &str) -> Option<Box<dyn Fn(Args)>> {
     match command {
@@ -16,9 +53,9 @@ fn exit_handle(_args: Args) {
 }
 
 pub fn spawn_child(command: Tokens, sender: Sender<ShellEvent>) {
-    let is_background_process = command.is_background_process();
+    let is_background = command.is_background_process();
     let (reader, writer) = std::io::pipe().expect("Failed to create a new pipe");
-    let mut child = match Command::new(command.command())
+    let mut process = match Command::new(command.command())
         .args(command.into_args().0)
         .stdin(reader)
         .spawn()
@@ -30,19 +67,20 @@ pub fn spawn_child(command: Tokens, sender: Sender<ShellEvent>) {
         }
     };
 
-    let child_pid = child.id();
+    let id = process.id();
+    let child = ChildProcess {
+        id,
+        stdin: Some(writer),
+        is_background,
+    };
 
     std::thread::spawn(move || {
         sender
-            .send(ShellEvent::NewChild(
-                child_pid,
-                is_background_process,
-                writer,
-            ))
+            .send(ShellEvent::NewChild(child))
             .expect("Unable to send an event");
-        child.wait().expect("Err lol");
+        process.wait().expect("Err lol");
         sender
-            .send(ShellEvent::ChildExited(child_pid))
+            .send(ShellEvent::ChildExited(id))
             .expect("Unable to send an event");
     });
 }

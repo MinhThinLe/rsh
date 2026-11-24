@@ -1,22 +1,22 @@
-use std::io::{PipeWriter, Write, stdout};
+use std::io::{Write, stdout};
 use std::str::FromStr;
 use std::sync::mpsc::{Receiver, Sender, channel};
 
-use crate::commands::{get_builtin_handle, spawn_child};
+use crate::commands::{ChildProcess, get_builtin_handle, spawn_child};
 use crate::input::{Input, input_thread};
 use crate::tokenizer::{TokenizingError, Tokens};
 
 pub enum ShellEvent {
     CtrlC,
     Input(Input),
-    NewChild(u32, bool, PipeWriter),
+    NewChild(ChildProcess),
     ChildExited(u32),
 }
 
 pub struct Shell {
     events: Receiver<ShellEvent>,
     sender: Sender<ShellEvent>,
-    foreground_process: Option<(PipeWriter, u32)>,
+    foreground_process: Option<ChildProcess>,
 }
 
 impl Shell {
@@ -43,16 +43,16 @@ impl Shell {
                     print_prompt();
                 }
                 ShellEvent::Input(string) => self.process_input(string),
-                ShellEvent::NewChild(id, is_background, stdin) => {
-                    println!("Child process {id} spawned");
-                    if !is_background {
-                        self.foreground_process = Some((stdin, id));
+                ShellEvent::NewChild(child) => {
+                    println!("Child process {} spawned", child.id());
+                    if child.is_foreground() {
+                        self.foreground_process = Some(child);
                     }
                 }
                 ShellEvent::ChildExited(id) => {
                     println!("Child process {id} exited");
-                    if let Some((ref _stdin, child_id)) = self.foreground_process
-                        && id == child_id
+                    if let Some(ref child) = self.foreground_process
+                        && child.id() == id
                     {
                         self.foreground_process = None;
                     }
@@ -63,21 +63,19 @@ impl Shell {
     }
 
     fn process_input(&mut self, input: Input) {
-        if let Some((ref mut stdin, _id)) = self.foreground_process {
-            let input = match input {
-                Input::Newline => vec![b'\n'],
-                Input::Eof => {
-                    self.foreground_process = None; // Properly drop this later
-                    return;
-                }
-                Input::Line(line) => line.into_bytes(),
-            };
-            stdin.write_all(&input).expect("Unable to write to a pipe");
-            stdin.flush().expect("Unable to flush stdin");
+        if let Some(ref mut child) = self.foreground_process {
+            child
+                .handle_input(input)
+                .expect("Failed while trying to give a child input");
             return;
         }
         let command = match input {
-            Input::Newline | Input::Eof => {
+            Input::Newline => {
+                print_prompt();
+                return;
+            }
+            Input::Eof => {
+                println!("");
                 print_prompt();
                 return;
             }
