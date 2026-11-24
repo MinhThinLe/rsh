@@ -17,8 +17,10 @@ fn exit_handle(_args: Args) {
 
 pub fn spawn_child(command: Tokens, sender: Sender<ShellEvent>) {
     let is_background_process = command.is_background_process();
+    let (reader, writer) = std::io::pipe().expect("Failed to create a new pipe");
     let mut child = match Command::new(command.command())
         .args(command.into_args().0)
+        .stdin(reader)
         .spawn()
     {
         Ok(child) => child,
@@ -32,7 +34,11 @@ pub fn spawn_child(command: Tokens, sender: Sender<ShellEvent>) {
 
     std::thread::spawn(move || {
         sender
-            .send(ShellEvent::NewChild(child_pid, is_background_process))
+            .send(ShellEvent::NewChild(
+                child_pid,
+                is_background_process,
+                writer,
+            ))
             .expect("Unable to send an event");
         child.wait().expect("Err lol");
         sender
