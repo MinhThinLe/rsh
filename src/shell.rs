@@ -46,7 +46,7 @@ impl Shell {
                 ShellEvent::NewChild(id, is_background, stdin) => {
                     println!("Child process {id} spawned");
                     if !is_background {
-                        self.foreground_process = Some((stdin, id))
+                        self.foreground_process = Some((stdin, id));
                     }
                 }
                 ShellEvent::ChildExited(id) => {
@@ -54,7 +54,7 @@ impl Shell {
                     if let Some((ref _stdin, child_id)) = self.foreground_process
                         && id == child_id
                     {
-                        self.foreground_process = None
+                        self.foreground_process = None;
                     }
                     print_prompt();
                 }
@@ -66,18 +66,18 @@ impl Shell {
         if let Some((ref mut stdin, _id)) = self.foreground_process {
             let input = match input {
                 Input::Newline => vec![b'\n'],
-                Input::EOF => {
+                Input::Eof => {
                     self.foreground_process = None; // Properly drop this later
                     return;
                 }
                 Input::Line(line) => line.into_bytes(),
             };
-            stdin.write(&input).expect("Unable to write to a pipe");
+            stdin.write_all(&input).expect("Unable to write to a pipe");
             stdin.flush().expect("Unable to flush stdin");
             return;
         }
         let command = match input {
-            Input::Newline | Input::EOF => {
+            Input::Newline | Input::Eof => {
                 print_prompt();
                 return;
             }

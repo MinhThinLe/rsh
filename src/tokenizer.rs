@@ -75,10 +75,7 @@ impl Tokens {
     }
 
     pub fn is_background_process(&self) -> bool {
-        self.0
-            .last()
-            .map(|item| item.contains('&'))
-            .unwrap_or_default()
+        self.0.last().is_some_and(|item| item.contains('&'))
     }
 }
 

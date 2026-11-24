@@ -4,7 +4,7 @@ use crate::shell::ShellEvent;
 
 pub enum Input {
     Newline,
-    EOF,
+    Eof,
     Line(String),
 }
 
@@ -17,9 +17,9 @@ pub fn input_thread(sender: Sender<ShellEvent>) {
                 .expect("Failed to read from stdin");
 
             let event = match line {
-                ref _empty if line.is_empty() => Input::EOF,
+                ref _empty if line.is_empty() => Input::Eof,
                 ref _newline if line.trim().is_empty() => Input::Newline,
-                ref line => Input::Line(line.to_string()),
+                ref line => Input::Line(line.clone()),
             };
 
             sender
