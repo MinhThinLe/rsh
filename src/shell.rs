@@ -17,6 +17,7 @@ pub struct Shell {
     events: Receiver<ShellEvent>,
     sender: Sender<ShellEvent>,
     foreground_process: Option<ChildProcess>,
+    processess: Vec<u32>,
 }
 
 impl Shell {
@@ -30,6 +31,7 @@ impl Shell {
             events: events_receiver,
             sender: events_sender,
             foreground_process: None,
+            processess: Vec::new(),
         }
     }
 
@@ -45,12 +47,14 @@ impl Shell {
                 ShellEvent::Input(string) => self.process_input(string),
                 ShellEvent::NewChild(child) => {
                     println!("Child process {} spawned", child.id());
+                    self.processess.push(child.id());
                     if child.is_foreground() {
                         self.foreground_process = Some(child);
                     }
                 }
                 ShellEvent::ChildExited(id) => {
                     println!("Child process {id} exited");
+                    self.processess.retain(|child_id| *child_id != id);
                     if let Some(ref child) = self.foreground_process
                         && child.id() == id
                     {
@@ -75,7 +79,7 @@ impl Shell {
                 return;
             }
             Input::Eof => {
-                println!("");
+                println!();
                 print_prompt();
                 return;
             }

@@ -1,5 +1,5 @@
 use std::io::{PipeWriter, Write};
-use std::process::{Command, exit};
+use std::process::{Command, Stdio, exit};
 use std::sync::mpsc::Sender;
 
 use crate::input::Input;
@@ -17,11 +17,11 @@ impl ChildProcess {
         self.stdin = None;
     }
 
-    pub fn is_foreground(&self) -> bool {
+    pub const fn is_foreground(&self) -> bool {
         !self.is_background
     }
 
-    pub fn id(&self) -> u32 {
+    pub const fn id(&self) -> u32 {
         self.id
     }
 
@@ -33,7 +33,7 @@ impl ChildProcess {
         match input {
             Input::Eof => {
                 self.close_stdin();
-                return Ok(());
+                Ok(())
             }
             Input::Newline => stdin.write_all(b"\n"),
             Input::Line(line) => stdin.write_all(line.as_bytes()),
@@ -54,23 +54,19 @@ fn exit_handle(_args: Args) {
 
 pub fn spawn_child(command: Tokens, sender: Sender<ShellEvent>) {
     let is_background = command.is_background_process();
-    let (reader, writer) = std::io::pipe().expect("Failed to create a new pipe");
-    let mut process = match Command::new(command.command())
-        .args(command.into_args().0)
-        .stdin(reader)
-        .spawn()
-    {
+    let (mut command, stdin) = create_command(command);
+
+    let mut process = match command.spawn() {
         Ok(child) => child,
         Err(err) => {
-            println!("{err}");
+            eprintln!("{err}");
             return;
         }
     };
 
-    let id = process.id();
     let child = ChildProcess {
-        id,
-        stdin: Some(writer),
+        stdin,
+        id: process.id(),
         is_background,
     };
 
@@ -80,7 +76,32 @@ pub fn spawn_child(command: Tokens, sender: Sender<ShellEvent>) {
             .expect("Unable to send an event");
         process.wait().expect("Err lol");
         sender
-            .send(ShellEvent::ChildExited(id))
+            .send(ShellEvent::ChildExited(process.id()))
             .expect("Unable to send an event");
     });
+}
+
+fn create_command(tokens: Tokens) -> (Command, Option<PipeWriter>) {
+    let is_background = tokens.is_background_process();
+    let (reader, writer) = std::io::pipe().expect("Failed to create a new pipe");
+    let mut command = Command::new(tokens.command());
+
+    command.stdin(if is_background {
+        Stdio::null()
+    } else {
+        reader.into()
+    });
+    command.stdout(get_io_source(is_background));
+    command.stderr(get_io_source(is_background));
+    command.args(tokens.into_args().0);
+
+    (command, if is_background { None } else { Some(writer) })
+}
+
+fn get_io_source(is_background: bool) -> Stdio {
+    if is_background {
+        Stdio::null()
+    } else {
+        Stdio::inherit()
+    }
 }
