@@ -50,6 +50,8 @@ impl Shell {
                     self.processess.push(child.id());
                     if child.is_foreground() {
                         self.foreground_process = Some(child);
+                    } else {
+                        print_prompt();
                     }
                 }
                 ShellEvent::ChildExited(id) => {
