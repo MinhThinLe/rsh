@@ -17,7 +17,7 @@ pub struct Shell {
     events: Receiver<ShellEvent>,
     sender: Sender<ShellEvent>,
     foreground_process: Option<ChildProcess>,
-    processess: Vec<u32>,
+    pub(crate) processess: Vec<u32>,
 }
 
 impl Shell {
@@ -95,7 +95,7 @@ impl Shell {
         };
 
         if let Some(builtin) = get_builtin_handle(tokens.command()) {
-            builtin(tokens.into_args());
+            builtin(self, tokens.into_args());
             return;
         }
 

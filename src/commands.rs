@@ -3,7 +3,7 @@ use std::process::{Command, Stdio, exit};
 use std::sync::mpsc::Sender;
 
 use crate::input::Input;
-use crate::shell::ShellEvent;
+use crate::shell::{Shell, ShellEvent};
 use crate::tokenizer::{Args, Tokens};
 
 pub struct ChildProcess {
@@ -41,15 +41,23 @@ impl ChildProcess {
     }
 }
 
-pub fn get_builtin_handle(command: &str) -> Option<Box<dyn Fn(Args)>> {
+pub fn get_builtin_handle(command: &str) -> Option<Box<dyn Fn(&Shell, Args)>> {
     match command {
         "exit" => Some(Box::new(exit_handle)),
+        "list" => Some(Box::new(list_processes_handle)),
         _ => None,
     }
 }
 
-fn exit_handle(_args: Args) {
+fn exit_handle(_shell: &Shell, _args: Args) {
     exit(0)
+}
+
+fn list_processes_handle(shell: &Shell, _args: Args) {
+    println!("processess");
+    for process in shell.processess.iter() {
+        println!("\t{process}")
+    }
 }
 
 pub fn spawn_child(command: Tokens, sender: Sender<ShellEvent>) {
