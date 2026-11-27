@@ -40,15 +40,23 @@ impl Shell {
         loop {
             let event = self.events.recv().expect("Unable to receive an event");
             match event {
-                ShellEvent::CtrlC => {
-                    println!("Ctrl c received");
-                    print_prompt();
-                }
+                ShellEvent::CtrlC => self.handle_ctrl_c(),
                 ShellEvent::Input(string) => self.process_input(string),
                 ShellEvent::NewChild(child) => self.handle_new_child(child),
                 ShellEvent::ChildExited(id) => self.handle_child_exit(id),
             }
         }
+    }
+
+    fn handle_ctrl_c(&mut self) {
+        if self.foreground_process.is_none() {
+            println!();
+            print_prompt();
+            return;
+        }
+        // Waits for the child process to terminate from Ctrl-C, extremely hacky
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        println!()
     }
 
     fn handle_new_child(&mut self, child: ChildProcess) {
