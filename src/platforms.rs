@@ -1,5 +1,4 @@
-#[cfg(target_os = "linux")]
-use rustix::path;
+use std::path::Path;
 
 #[cfg(target_os = "linux")]
 pub fn get_process_name(pid: u32) -> String {
@@ -9,10 +8,8 @@ pub fn get_process_name(pid: u32) -> String {
     string.trim().to_string()
 }
 
-#[cfg(target_os = "linux")]
-pub fn change_directory(dest_dir: impl path::Arg) {
-    use rustix::process::chdir;
-    if let Err(e) = chdir(dest_dir) {
+pub fn change_directory(dest_dir: impl AsRef<Path>) {
+    if let Err(e) = std::env::set_current_dir(dest_dir) {
         println!("{e}");
     }
 }

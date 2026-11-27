@@ -45,27 +45,29 @@ impl Shell {
                     print_prompt();
                 }
                 ShellEvent::Input(string) => self.process_input(string),
-                ShellEvent::NewChild(child) => {
-                    println!("Child process {} spawned", child.id());
-                    self.processess.push(child.id());
-                    if child.is_foreground() {
-                        self.foreground_process = Some(child);
-                    } else {
-                        print_prompt();
-                    }
-                }
-                ShellEvent::ChildExited(id) => {
-                    println!("Child process {id} exited");
-                    self.processess.retain(|child_id| *child_id != id);
-                    if let Some(ref child) = self.foreground_process
-                        && child.id() == id
-                    {
-                        self.foreground_process = None;
-                    }
-                    print_prompt();
-                }
+                ShellEvent::NewChild(child) => self.handle_new_child(child),
+                ShellEvent::ChildExited(id) => self.handle_child_exit(id),
             }
         }
+    }
+
+    fn handle_new_child(&mut self, child: ChildProcess) {
+        self.processess.push(child.id());
+        if child.is_foreground() {
+            self.foreground_process = Some(child);
+        } else {
+            print_prompt();
+        }
+    }
+
+    fn handle_child_exit(&mut self, child_id: u32) {
+        self.processess.retain(|id| *id != child_id);
+        if let Some(ref child) = self.foreground_process
+            && child.id() == child_id
+        {
+            self.foreground_process = None;
+        }
+        print_prompt();
     }
 
     fn process_input(&mut self, input: Input) {

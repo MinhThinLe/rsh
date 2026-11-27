@@ -1,5 +1,4 @@
 use std::io::{PipeWriter, Write};
-use std::os::unix::ffi::OsStrExt;
 use std::process::{Command, Stdio, exit};
 use std::sync::mpsc::Sender;
 
@@ -70,7 +69,7 @@ fn change_directory_handle(_shell: &Shell, args: Args) {
             println!("No home dir?");
             return;
         };
-        change_directory(home_dir.as_os_str().as_bytes());
+        change_directory(home_dir);
         return;
     }
 
@@ -78,7 +77,7 @@ fn change_directory_handle(_shell: &Shell, args: Args) {
         println!("Too many arguments");
         return;
     }
-    change_directory(args.0[0].as_str());
+    change_directory(&args.0[0]);
 }
 
 pub fn spawn_child(command: Tokens, sender: Sender<ShellEvent>) {
