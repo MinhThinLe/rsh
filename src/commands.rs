@@ -1,9 +1,10 @@
 use std::io::{PipeWriter, Write};
+use std::os::unix::ffi::OsStrExt;
 use std::process::{Command, Stdio, exit};
 use std::sync::mpsc::Sender;
 
 use crate::input::Input;
-use crate::platforms::get_process_name;
+use crate::platforms::{change_directory, get_process_name};
 use crate::shell::{Shell, ShellEvent};
 use crate::tokenizer::{Args, Tokens};
 
@@ -46,6 +47,7 @@ pub fn get_builtin_handle(command: &str) -> Option<Box<dyn Fn(&Shell, Args)>> {
     match command {
         "exit" => Some(Box::new(exit_handle)),
         "list" => Some(Box::new(list_processes_handle)),
+        "cd" => Some(Box::new(change_directory_handle)),
         _ => None,
     }
 }
@@ -60,6 +62,23 @@ fn list_processes_handle(shell: &Shell, _args: Args) {
         let process_name = get_process_name(*process);
         println!("\t{process}\t{process_name}");
     }
+}
+
+fn change_directory_handle(_shell: &Shell, args: Args) {
+    if args.0.is_empty() {
+        let Some(home_dir) = std::env::home_dir() else {
+            println!("No home dir?");
+            return;
+        };
+        change_directory(home_dir.as_os_str().as_bytes());
+        return;
+    }
+
+    if args.0.len() > 1 {
+        println!("Too many arguments");
+        return;
+    }
+    change_directory(args.0[0].as_str());
 }
 
 pub fn spawn_child(command: Tokens, sender: Sender<ShellEvent>) {
