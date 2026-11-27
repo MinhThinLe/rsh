@@ -2,6 +2,7 @@
 
 mod commands;
 mod input;
+mod platforms;
 mod shell;
 mod tokenizer;
 

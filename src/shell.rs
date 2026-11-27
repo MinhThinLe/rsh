@@ -98,6 +98,7 @@ impl Shell {
 
         if let Some(builtin) = get_builtin_handle(tokens.command()) {
             builtin(self, tokens.into_args());
+            print_prompt();
             return;
         }
 

@@ -3,6 +3,7 @@ use std::process::{Command, Stdio, exit};
 use std::sync::mpsc::Sender;
 
 use crate::input::Input;
+use crate::platforms::get_process_name;
 use crate::shell::{Shell, ShellEvent};
 use crate::tokenizer::{Args, Tokens};
 
@@ -56,7 +57,8 @@ fn exit_handle(_shell: &Shell, _args: Args) {
 fn list_processes_handle(shell: &Shell, _args: Args) {
     println!("processess");
     for process in shell.processess.iter() {
-        println!("\t{process}")
+        let process_name = get_process_name(*process);
+        println!("\t{process}\t{process_name}");
     }
 }
 
